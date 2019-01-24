@@ -1,0 +1,19 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "site-provisioning-tool-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/siteProvisioningTool/SiteProvisioningToolWebPart.js",
+          "manifest": "./src/webparts/siteProvisioningTool/SiteProvisioningToolWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "SiteProvisioningToolWebPartStrings": "lib/webparts/siteProvisioningTool/loc/{locale}.js",
+    "ControlStrings": "node_modules/@pnp/spfx-controls-react/lib/loc/{locale}.js"
+  }
+}
