@@ -18,11 +18,7 @@
       "es6-promise",
       "webpack-env"
     ],
-    "lib": [
-      "es5",
-      "dom",
-      "es2015.collection"
-    ]
+    "lib": ["es2015", "es2017", "dom"]
   },
   "include": [
     "src/**/*.ts"

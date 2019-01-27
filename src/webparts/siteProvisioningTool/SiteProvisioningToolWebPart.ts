@@ -21,7 +21,8 @@ export default class SiteProvisioningToolWebPart extends BaseClientSideWebPart<I
     const element: React.ReactElement<ISiteProvisioningToolProps > = React.createElement(
       SiteProvisioningTool,
       {
-        description: this.properties.description
+        description: this.properties.description,
+        context : this.context
       }
     );
 
