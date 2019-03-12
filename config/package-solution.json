@@ -5,7 +5,6 @@
     "id": "da3cb300-dd13-4678-9bc3-3f698a829639",
     "version": "1.0.0.0",
     "includeClientSideAssets": true,
-    "skipFeatureDeployment": true,
     "webApiPermissionRequests": [
       {
         "resource": "Microsoft Graph",
