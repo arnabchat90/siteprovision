@@ -15,10 +15,10 @@ export interface ISiteProvisioningToolState {
   loadForm: boolean;
   showCurrentStatus: boolean;
   currentStatus: string;
-  currentCreatedSiteUrl : string;
+  currentCreatedSiteUrl: string;
   loadingLists: boolean;
-  listTitles : any;
-  error : any;
+  listTitles: any;
+  error: any;
 }
 
 import MockHttpClient from './MockHttpClient';
@@ -41,6 +41,10 @@ import { setLanguage } from '@uifabric/utilities/lib';
 
 const graphUrl = 'https://graph.microsoft.com/v1.0/groups';
 
+function onQueryFailed(sender, args) {
+
+  alert('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
+}
 export default class SiteProvisioningTool extends React.Component<ISiteProvisioningToolProps, ISiteProvisioningToolState> {
   constructor(props: ISiteProvisioningToolProps, state: ISiteProvisioningToolState) {
     super(props);
@@ -48,15 +52,16 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       loadForm: false,
       showCurrentStatus: false,
       currentStatus: '',
-      currentCreatedSiteUrl : '',
-      loadingLists : false,
-      listTitles : [],
-      error : ''
+      currentCreatedSiteUrl: '',
+      loadingLists: false,
+      listTitles: [],
+      error: ''
     };
     this.loadForm = this.loadForm.bind(this);
     this.createSiteCollection = this.createSiteCollection.bind(this);
     this.getListsTitles = this.getListsTitles.bind(this);
-
+    this.createDocumentLibrariesJSOM = this.createDocumentLibrariesJSOM.bind(this);
+    this.readLibraryConfigurationList = this.readLibraryConfigurationList.bind(this);
   }
 
   private getListsTitles(siteUrl): void {
@@ -91,12 +96,84 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       });
     });
   }
+
+
+  private readLibraryConfigurationList(clientContext: SP.ClientContext, libName: string): Promise<any> {
+    return new Promise<any>((resolve: (itemObjects: any) => void, reject: (error: any) => void): void => {
+      var self = this;
+      var oList = clientContext.get_web().get_lists().getById(libName);
+      var query = SP.CamlQuery.createAllItemsQuery();
+      var collListItem = oList.getItems(query);
+      clientContext.load(collListItem);
+      clientContext.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
+        const listEnumerator: IEnumerator<SP.ListItem> = collListItem.getEnumerator();
+        const itemObjects: object[] = [];
+        while (listEnumerator.moveNext()) {
+          const list: SP.ListItem = listEnumerator.get_current();
+          itemObjects.push({
+            LibraryName: list.get_item('Title'),
+            Level1: list.get_item('Level1'),
+            Level2: list.get_item('Level2'),
+            Level3: list.get_item('Level3')
+          });
+        }
+        resolve(itemObjects);
+
+      }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+        self.setState({
+          loadingLists: false,
+          listTitles: [],
+          error: args.get_message()
+        });
+      });
+    });
+
+  }
+
+  private createDocumentLibrariesJSOM(siteUrl): void {
+    this.setState({
+      currentStatus: 'Creating Document Libraries...',
+      error: null
+    });
+    //read the list to get the project structure
+
+
+    const context: SP.ClientContext = new SP.ClientContext(siteUrl);
+    const lists: SP.ListCollection = context.get_web().get_lists();
+    //name of doc library hard coded.
+    this.readLibraryConfigurationList(context, "DocumentLibraryStructure").then((items : any) => {
+      console.log(items)
+      //create doc libraries based on the configuration list
+    });
+    context.load(lists, 'Include(Title)');
+    context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
+      const listEnumerator: IEnumerator<SP.List> = lists.getEnumerator();
+
+      const titles: string[] = ['Current Site Collection - ' + siteUrl];
+      while (listEnumerator.moveNext()) {
+        const list: SP.List = listEnumerator.get_current();
+        titles.push(list.get_title());
+      }
+      console.log(titles);
+      this.setState((prevState: ISiteProvisioningToolState, props: ISiteProvisioningToolProps): ISiteProvisioningToolState => {
+        prevState.listTitles = titles;
+        prevState.loadingLists = false;
+        return prevState;
+      });
+    }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+      this.setState({
+        loadingLists: false,
+        listTitles: [],
+        error: args.get_message()
+      });
+    });
+  }
   // called with the Create Site button is cliecked
   loadForm(event: any) {
     this.setState({ loadForm: true });
   }
   createSiteCollection(formData: IFormData) {
-    this.setState({showCurrentStatus : true,currentStatus : "Provisioning your site"});
+    this.setState({ showCurrentStatus: true, currentStatus: "Provisioning your site" });
     var self = this;
     const siteCreationBody: string = JSON.stringify(
       {
@@ -116,7 +193,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       }).then(data => {
         console.log(data);
         //get root site collection id from group id
-        self.setState({showCurrentStatus : true,currentStatus : "Created Site Collection, looking for the site id..."});
+        self.setState({ showCurrentStatus: true, currentStatus: "Created Site Collection, looking for the site id..." });
         var groupId = data.id;
         setTimeout(function () {
           self.getSiteCollectionIdFromGroupId(self, groupId)
@@ -124,10 +201,11 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               return response.json();
             })
             .then(data => {
-              self.setState({showCurrentStatus : true,currentStatus : "Got the Site Collection ID"});
+              self.setState({ showCurrentStatus: true, currentStatus: "Got the Site Collection ID" });
               var siteCollectionId = data.id;
-              self.setState({currentCreatedSiteUrl : data.webUrl});
-              //self.getListsTitles(data.webUrl);
+              self.setState({ currentCreatedSiteUrl: data.webUrl });
+              //create document libraries and Folder Structure
+              self.createDocumentLibrariesJSOM(self.context.pageContext.web.absoluteUrl);
               var listCreationBody = JSON.stringify({
                 displayName: "Books",
                 columns: [
@@ -150,8 +228,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
                 })
                 .then(data => {
                   self.getListsTitles(self.state.currentCreatedSiteUrl);
-                  self.setState({showCurrentStatus : true,currentStatus : "Your brand new team site has been created"});
-                  Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl}).click();
+                  self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
+                  Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
                 });
             });
         }, 10000);
@@ -241,7 +319,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
             </div>
 
           </div>
-          
+
           <div className={styles.row}>
             <div className={styles.column}>
               {/* <button onClick={this.loadForm} className={styles.button}>
@@ -255,13 +333,13 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         </div> : <MainForm createSiteCollection={this.createSiteCollection} spContext={this.props.context} currentStatus={this.state.currentStatus} showCurrentStatus={this.state.showCurrentStatus} />}
         <br />
         {this.state.loadingLists &&
-                <span>Loading lists...</span>}
-              {this.state.error &&
-                <span>An error has occurred while loading lists: {this.state.error}</span>}
-              {this.state.error === null && titles &&
-                <ul>
-                  {titles}
-                </ul>}
+          <span>Loading lists...</span>}
+        {this.state.error &&
+          <span>An error has occurred while loading lists: {this.state.error}</span>}
+        {this.state.error === null && titles &&
+          <ul>
+            {titles}
+          </ul>}
       </div>
     );
   }
