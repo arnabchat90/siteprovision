@@ -153,7 +153,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         var newDocLib = lists.add(docLibCreation);
         context.load(newDocLib);
         context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
-          
+          //new doc library created now create folders by reading the folders list
         }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
           //if doc lib already exists try to create levels
           
