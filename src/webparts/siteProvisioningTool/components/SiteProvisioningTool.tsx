@@ -131,6 +131,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
   }
 
   private createDocumentLibrariesJSOM(siteUrl): void {
+    var self = this;
     this.setState({
       currentStatus: 'Creating Document Libraries...',
       error: null
@@ -141,9 +142,23 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     const context: SP.ClientContext = new SP.ClientContext(siteUrl);
     const lists: SP.ListCollection = context.get_web().get_lists();
     //name of doc library hard coded.
-    this.readLibraryConfigurationList(context, "DocumentLibraryStructure").then((items : any) => {
+    this.readLibraryConfigurationList(context, "DocumentLibraryStructure").then((items: any) => {
       console.log(items)
       //create doc libraries based on the configuration list
+      items.forEach(element => {
+        var docLibCreation : SP.ListCreationInformation;
+        docLibCreation = new SP.ListCreationInformation();
+        docLibCreation.set_title(element.LibraryName); //list title
+        docLibCreation.set_templateType(SP.ListTemplateType.documentLibrary); //document library type
+        var newDocLib = lists.add(docLibCreation);
+        context.load(newDocLib);
+        context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
+          
+        }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+          //if doc lib already exists try to create levels
+          
+        });
+      });
     });
     context.load(lists, 'Include(Title)');
     context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
