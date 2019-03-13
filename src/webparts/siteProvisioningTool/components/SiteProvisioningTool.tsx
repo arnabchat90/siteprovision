@@ -45,6 +45,34 @@ function onQueryFailed(sender, args) {
 
   alert('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
 }
+
+function createFolder(list, folderUrl) {
+  var createFolderInternal = function (parentFolder, folderUrl) {
+    var ctx = parentFolder.get_context();
+    var folderNames = folderUrl.split("/");
+    var folderName = folderNames.shift();
+    var folder = parentFolder.get_folders().add(folderName);
+    ctx.load(folder);
+    return executeQuery(ctx)
+      .then(function () {
+        if (folderNames.length > 0) {
+          return createFolderInternal(folder, folderNames.join("/"));
+        }
+        return folder;
+      });
+  };
+  return createFolderInternal(list.get_rootFolder(), folderUrl);
+}
+
+function executeQuery(context) {
+  return new Promise(function (resolve, reject) {
+    context.executeQueryAsync(function () {
+      resolve();
+    }, function (sender, args) {
+      reject(args);
+    });
+  });
+}
 export default class SiteProvisioningTool extends React.Component<ISiteProvisioningToolProps, ISiteProvisioningToolState> {
   constructor(props: ISiteProvisioningToolProps, state: ISiteProvisioningToolState) {
     super(props);
@@ -62,6 +90,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     this.getListsTitles = this.getListsTitles.bind(this);
     this.createDocumentLibrariesJSOM = this.createDocumentLibrariesJSOM.bind(this);
     this.readLibraryConfigurationList = this.readLibraryConfigurationList.bind(this);
+    this.createFolderStructure = this.createFolderStructure.bind(this);
   }
 
   private getListsTitles(siteUrl): void {
@@ -101,25 +130,40 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
   private readLibraryConfigurationList(clientContext: SP.ClientContext, libName: string): Promise<any> {
     return new Promise<any>((resolve: (itemObjects: any) => void, reject: (error: any) => void): void => {
       var self = this;
-      var oList = clientContext.get_web().get_lists().getById(libName);
+      var oList = clientContext.get_web().get_lists().getByTitle(libName);
       var query = SP.CamlQuery.createAllItemsQuery();
       var collListItem = oList.getItems(query);
       clientContext.load(collListItem);
       clientContext.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
         const listEnumerator: IEnumerator<SP.ListItem> = collListItem.getEnumerator();
-        const itemObjects: object[] = [];
+        let itemObjects = [];
+
         while (listEnumerator.moveNext()) {
-          const list: SP.ListItem = listEnumerator.get_current();
+          const listItem: SP.ListItem = listEnumerator.get_current();
+          var folderArr = [];
+          // for (var i = 1; i <= 10; i++) {
+          //   folderArr[i] = "";
+          // }
+          var folderTree = "";
+          for (var i = 1; i <= 10; i++) {
+            if (listItem.get_item('Level' + i) !== "" && listItem.get_item('Level' + i) !== null && listItem.get_item('Level' + i) !== undefined) {
+              folderArr.push(listItem.get_item('Level' + i));
+            }
+          }
+
+          if (folderArr.length > 0) {
+            folderTree = folderArr.join('/');
+          }
           itemObjects.push({
-            LibraryName: list.get_item('Title'),
-            Level1: list.get_item('Level1'),
-            Level2: list.get_item('Level2'),
-            Level3: list.get_item('Level3')
+            LibraryName: listItem.get_item('Title'),
+            FolderStructure: folderTree
           });
+
         }
         resolve(itemObjects);
 
       }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+        reject(args.get_message());
         self.setState({
           loadingLists: false,
           listTitles: [],
@@ -130,59 +174,79 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
 
   }
 
-  private createDocumentLibrariesJSOM(siteUrl): void {
-    var self = this;
-    this.setState({
-      currentStatus: 'Creating Document Libraries...',
-      error: null
-    });
-    //read the list to get the project structure
+  private createDocumentLibrariesJSOM(siteUrl, newSiteColURL): Promise<any> {
 
+    return new Promise<any>((resolve: (itemObjects: any) => void, reject: (error: any) => void): void => {
+      var self = this;
+      this.setState({
+        currentStatus: 'Creating Document Libraries...',
+        error: null
+      });
+      //read the list to get the project structure
+      const context: SP.ClientContext = new SP.ClientContext(siteUrl);
 
-    const context: SP.ClientContext = new SP.ClientContext(siteUrl);
-    const lists: SP.ListCollection = context.get_web().get_lists();
-    //name of doc library hard coded.
-    this.readLibraryConfigurationList(context, "DocumentLibraryStructure").then((items: any) => {
-      console.log(items)
-      //create doc libraries based on the configuration list
-      items.forEach(element => {
-        var docLibCreation : SP.ListCreationInformation;
-        docLibCreation = new SP.ListCreationInformation();
-        docLibCreation.set_title(element.LibraryName); //list title
-        docLibCreation.set_templateType(SP.ListTemplateType.documentLibrary); //document library type
-        var newDocLib = lists.add(docLibCreation);
-        context.load(newDocLib);
-        context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
-          //new doc library created now create folders by reading the folders list
-        }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
-          //if doc lib already exists try to create levels
-          
-        });
+      const newContext: SP.ClientContext = new SP.ClientContext(newSiteColURL);
+      const newlists: SP.ListCollection = newContext.get_web().get_lists();
+
+      //name of doc library hard coded.
+      this.readLibraryConfigurationList(context, "DocumentLibraryStructure").then((items: any) => {
+        console.log(items);
+        //create doc libraries based on the configuration list
+
+        var loop = function (i) {
+          self.createFolderStructure(items[i], newlists, newContext, resolve, self, i, function () {
+              if (++i < items.length) {
+                  loop(i);
+                  
+              } else {
+                  //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
+                    self.setState({
+                      currentStatus: 'All folders created',
+                      error: null
+                    });
+                    resolve(true);
+              }
+          });
+      };
+      loop(0);
+      
       });
     });
-    context.load(lists, 'Include(Title)');
-    context.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
-      const listEnumerator: IEnumerator<SP.List> = lists.getEnumerator();
 
-      const titles: string[] = ['Current Site Collection - ' + siteUrl];
-      while (listEnumerator.moveNext()) {
-        const list: SP.List = listEnumerator.get_current();
-        titles.push(list.get_title());
-      }
-      console.log(titles);
-      this.setState((prevState: ISiteProvisioningToolState, props: ISiteProvisioningToolProps): ISiteProvisioningToolState => {
-        prevState.listTitles = titles;
-        prevState.loadingLists = false;
-        return prevState;
+
+  }
+  private createFolderStructure(element: any, newlists: SP.ListCollection, newContext: SP.ClientContext, resolve: (itemObjects: any) => void, self: this, index,successFolderNavigation) {
+    var docLibCreation: SP.ListCreationInformation;
+    docLibCreation = new SP.ListCreationInformation();
+    docLibCreation.set_title(element.LibraryName); //list title
+    docLibCreation.set_templateType(SP.ListTemplateType.documentLibrary); //document library type
+    var newDocLib = newlists.add(docLibCreation);
+    newContext.load(newDocLib);
+    newContext.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
+      //new doc library created now create folders by reading the folders list
+      var folder = createFolder(newDocLib, element.FolderStructure);
+     
+      successFolderNavigation();
+      self.setState({
+        currentStatus: 'Creating folders -  ' + element.FolderStructure,
+        error: null
       });
     }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
-      this.setState({
-        loadingLists: false,
-        listTitles: [],
-        error: args.get_message()
+      //if doc lib already exists try to create levels -- todo
+      const list: SP.List = newContext.get_web().get_lists().getByTitle(element.LibraryName);
+      newContext.load(list);
+      newContext.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
+        var folder = createFolder(list, element.FolderStructure);
+        successFolderNavigation();
+        self.setState({
+          currentStatus: 'Creating folders -  ' + element.FolderStructure,
+          error: null
+        });
+      }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
       });
     });
   }
+
   // called with the Create Site button is cliecked
   loadForm(event: any) {
     this.setState({ loadForm: true });
@@ -220,32 +284,12 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               var siteCollectionId = data.id;
               self.setState({ currentCreatedSiteUrl: data.webUrl });
               //create document libraries and Folder Structure
-              self.createDocumentLibrariesJSOM(self.context.pageContext.web.absoluteUrl);
-              var listCreationBody = JSON.stringify({
-                displayName: "Books",
-                columns: [
-                  {
-                    name: "Author",
-                    text: {}
-                  },
-                  {
-                    name: "PageCount",
-                    number: {}
-                  }
-                ],
-                list: {
-                  "template": "documentLibrary"
-                }
+              self.createDocumentLibrariesJSOM(self.props.context.pageContext.web.absoluteUrl, data.webUrl).then((data) => {
+                self.getListsTitles(self.state.currentCreatedSiteUrl);
+                self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
+                Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
+
               });
-              self.createDocumentLibraries(self, siteCollectionId, listCreationBody)
-                .then(response => {
-                  return response.json();
-                })
-                .then(data => {
-                  self.getListsTitles(self.state.currentCreatedSiteUrl);
-                  self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
-                  Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
-                });
             });
         }, 10000);
 
