@@ -263,7 +263,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         ],
         mailEnabled: false,
         mailNickname: formData.groupEmailAddress,
-        securityEnabled: formData.privacyOptions.key == 'Private' ? true : false
+        securityEnabled : false,
+        visibility: formData.privacyOptions.key
       });
     //create the site collection using graph api
     self.createNewSiteCollectionUsingGraph(self, siteCreationBody)
