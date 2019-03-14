@@ -23,7 +23,11 @@ export interface IFormData {
     siteDescription: string;
     groupEmailAddress: string;
     siteOwners: Array<any>;
+    pm: Array<any>;
+    executive: Array<any>;
+    sp: Array<any>;
     privacyOptions: any;
+    practice : any;
 }
 
 export interface IMainProps {
@@ -31,6 +35,7 @@ export interface IMainProps {
     spContext: any;
     currentStatus: string;
     showCurrentStatus: boolean;
+    practiceTerms: any[];
 }
 
 export default class MainForm extends React.Component<IMainProps, IMainState> {
@@ -43,13 +48,20 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                 siteDescription: "",
                 groupEmailAddress: "",
                 siteOwners: [],
-                privacyOptions: {}
+                pm: [],
+                executive: [],
+                sp: [],
+                privacyOptions: {},
+                practice : {}
 
             }
         }
 
         this._handleOnChange = this._handleOnChange.bind(this);
         this._getPeoplePickerItems = this._getPeoplePickerItems.bind(this);
+        this._getPeoplePickerItemsPM = this._getPeoplePickerItemsPM.bind(this);
+        this._getPeoplePickerItemsExecutive = this._getPeoplePickerItemsExecutive.bind(this);
+        this._getPeoplePickerItemsSP = this._getPeoplePickerItemsSP.bind(this);
     }
 
     _handleOnChange(val: any, fieldName: string) {
@@ -68,6 +80,9 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
             case "privacyOptions":
                 tempFormData.privacyOptions = val;
                 break;
+            case "practice":
+                tempFormData.practice = val;
+                break;
         }
         this.setState({ formData: tempFormData });
     }
@@ -83,17 +98,32 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
         tempFormData.siteOwners = items;
         this.setState({ formData: tempFormData });
     }
+    private _getPeoplePickerItemsPM(items: any[]) {
+        var tempFormData = { ...this.state.formData };
+        tempFormData.pm = items;
+        this.setState({ formData: tempFormData });
+    }
+    private _getPeoplePickerItemsExecutive(items: any[]) {
+        var tempFormData = { ...this.state.formData };
+        tempFormData.executive = items;
+        this.setState({ formData: tempFormData });
+    }
+    private _getPeoplePickerItemsSP(items: any[]) {
+        var tempFormData = { ...this.state.formData };
+        tempFormData.sp = items;
+        this.setState({ formData: tempFormData });
+    }
 
     public render(): JSX.Element {
         return (
             <div className={styles.mainForm}>
                 <div className={styles.container}>
-                {this.props.showCurrentStatus == true ? <div className={styles.row}>
+                    {this.props.showCurrentStatus == true ? <div className={styles.row}>
                         <div className={styles.column}>
                             <h3>{this.props.currentStatus}</h3>
                         </div>
                     </div> : ""}
-                    
+
                     <div className={styles.row}>
                         <div className={styles.column}>
                             <Label style={{ fontWeight: FontWeights.semibold }} htmlFor="siteName">Site Name</Label>
@@ -112,6 +142,23 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                             <TextField id="groupEmailAddress" value={this.state.formData.groupEmailAddress} onChanged={(newValue) => { this._handleOnChange(newValue, "groupEmailAddress") }} />
                         </div>
                     </div>
+
+                    <div className={styles.row}>
+                        <div className={styles.column}>
+                            <Dropdown
+                                placeholder="Select an Option"
+                                label="Practice"
+                                style={{ fontWeight: FontWeights.semibold }}
+                                id="practice"
+                                ariaLabel="Basic dropdown example"
+                                options={this.props.practiceTerms}
+                                onFocus={this._log('onFocus called')}
+                                onBlur={this._log('onBlur called')}
+                                onChanged={(newValue) => { this._handleOnChange(newValue, "practice") }}
+                            />
+                        </div>
+                    </div>
+
                     <div className={styles.row}>
                         <div className={styles.column}>
                             <Dropdown
@@ -134,6 +181,48 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                         <div className={styles.column}>
                             <PeoplePicker
                                 context={this.props.spContext}
+                                titleText="Project Manager"
+                                personSelectionLimit={3}
+                                showtooltip={true}
+                                isRequired={true}
+                                selectedItems={this._getPeoplePickerItemsPM}
+                                showHiddenInUI={false}
+                                principalTypes={[PrincipalType.User]}
+                                resolveDelay={1000} />
+                        </div>
+                    </div>
+                    <div className={styles.row}>
+                        <div className={styles.column}>
+                            <PeoplePicker
+                                context={this.props.spContext}
+                                titleText="Executive"
+                                personSelectionLimit={3}
+                                showtooltip={true}
+                                isRequired={true}
+                                selectedItems={this._getPeoplePickerItemsExecutive}
+                                showHiddenInUI={false}
+                                principalTypes={[PrincipalType.User]}
+                                resolveDelay={500} />
+                        </div>
+                    </div>
+                    <div className={styles.row}>
+                        <div className={styles.column}>
+                            <PeoplePicker
+                                context={this.props.spContext}
+                                titleText="Sales Person"
+                                personSelectionLimit={3}
+                                showtooltip={true}
+                                isRequired={true}
+                                selectedItems={this._getPeoplePickerItemsSP}
+                                showHiddenInUI={false}
+                                principalTypes={[PrincipalType.User]}
+                                resolveDelay={500} />
+                        </div>
+                    </div>
+                    <div className={styles.row}>
+                        <div className={styles.column}>
+                            <PeoplePicker
+                                context={this.props.spContext}
                                 titleText="Site Collection Owner"
                                 personSelectionLimit={3}
                                 showtooltip={true}
@@ -141,8 +230,8 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                                 selectedItems={this._getPeoplePickerItems}
                                 showHiddenInUI={false}
                                 principalTypes={[PrincipalType.User]}
-                                resolveDelay={1000} />
-                        </div>
+                                resolveDelay={500} />
+                        </div> 
                     </div>
                     <div className={styles.row}>
                         <div className={styles.column}>

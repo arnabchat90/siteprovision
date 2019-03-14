@@ -36,6 +36,13 @@
       "globalDependencies": [
         "sp-runtime"
       ]
+    },
+    "taxonomy": {
+      "path": "https://nvsdev.sharepoint.com/_layouts/15/SP.Taxonomy.js",
+      "globalName": "SP",
+      "globalDependencies": [
+        "sharepoint"
+      ]
     }
   },
   "localizedResources": {
