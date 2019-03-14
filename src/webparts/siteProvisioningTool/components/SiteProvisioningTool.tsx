@@ -19,6 +19,7 @@ export interface ISiteProvisioningToolState {
   loadingLists: boolean;
   listTitles: any;
   error: any;
+  allPermissionLevels: any[];
 }
 
 import MockHttpClient from './MockHttpClient';
@@ -83,7 +84,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       currentCreatedSiteUrl: '',
       loadingLists: false,
       listTitles: [],
-      error: ''
+      error: '',
+      allPermissionLevels: []
     };
     this.loadForm = this.loadForm.bind(this);
     this.createSiteCollection = this.createSiteCollection.bind(this);
@@ -91,6 +93,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     this.createDocumentLibrariesJSOM = this.createDocumentLibrariesJSOM.bind(this);
     this.readLibraryConfigurationList = this.readLibraryConfigurationList.bind(this);
     this.createFolderStructure = this.createFolderStructure.bind(this);
+    this.createCustomPermissionLevels = this.createCustomPermissionLevels.bind(this);
   }
 
   private getListsTitles(siteUrl): void {
@@ -195,27 +198,27 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
 
         var loop = function (i) {
           self.createFolderStructure(items[i], newlists, newContext, resolve, self, i, function () {
-              if (++i < items.length) {
-                  loop(i);
-                  
-              } else {
-                  //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
-                    self.setState({
-                      currentStatus: 'All folders created',
-                      error: null
-                    });
-                    resolve(true);
-              }
+            if (++i < items.length) {
+              loop(i);
+
+            } else {
+              //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
+              self.setState({
+                currentStatus: 'All folders created',
+                error: null
+              });
+              resolve(true);
+            }
           });
-      };
-      loop(0);
-      
+        };
+        loop(0);
+
       });
     });
 
 
   }
-  private createFolderStructure(element: any, newlists: SP.ListCollection, newContext: SP.ClientContext, resolve: (itemObjects: any) => void, self: this, index,successFolderNavigation) {
+  private createFolderStructure(element: any, newlists: SP.ListCollection, newContext: SP.ClientContext, resolve: (itemObjects: any) => void, self: this, index, successFolderNavigation) {
     var docLibCreation: SP.ListCreationInformation;
     docLibCreation = new SP.ListCreationInformation();
     docLibCreation.set_title(element.LibraryName); //list title
@@ -225,7 +228,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     newContext.executeQueryAsync((sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
       //new doc library created now create folders by reading the folders list
       var folder = createFolder(newDocLib, element.FolderStructure);
-     
+
       successFolderNavigation();
       self.setState({
         currentStatus: 'Creating folders -  ' + element.FolderStructure,
@@ -247,6 +250,163 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     });
   }
 
+  createCustomPermissionLevels(newSiteUrl: string): Promise<any> {
+    var self = this;
+    return new Promise<any>((resolve: (itemObjects: any) => void, reject: (error: any) => void): void => {
+      const newContext: SP.ClientContext = new SP.ClientContext(newSiteUrl);
+      var customPermissionLevelNames = ['FULL ACCESS', 'Edit With Delete', 'Edit With No Delete', 'Read Only'];
+      var dsReadPermissions = [];
+      customPermissionLevelNames.forEach((item) => {
+        dsReadPermissions.push({ levelName: item, permissions: this.createPermissionSet(item) });
+      });
+      self.setState({
+        allPermissionLevels: dsReadPermissions
+      });
+      var loop = function (i) {
+        self.createCustomPermission(newContext, dsReadPermissions[i].levelName, dsReadPermissions[i].levelName, dsReadPermissions[i].permissions, function () {
+          if (++i < dsReadPermissions.length) {
+            self.setState({
+              currentStatus: 'Creating Custom Permission - ' + dsReadPermissions[i].levelName,
+              error: null
+            });
+            loop(i);
+            
+          } else {
+            //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
+            self.setState({
+              currentStatus: 'All Custom Permissions Created',
+              error: null
+            });
+            resolve(true);
+          }
+        }, function (error) {
+          reject(error);
+        });
+      };
+      loop(0);
+    });
+  }
+  createCustomPermission(context, name, desc, permissions, success, fail) {
+    // Create a new role definition.  
+    var roleDefinitionCreationInfo = new SP.RoleDefinitionCreationInformation();
+    roleDefinitionCreationInfo.set_name(name);
+    roleDefinitionCreationInfo.set_description(desc);
+    roleDefinitionCreationInfo.set_basePermissions(permissions);
+    var roleDefinition = context.get_site().get_rootWeb().get_roleDefinitions().add(roleDefinitionCreationInfo);
+    context.executeQueryAsync(success, fail);
+  }
+
+  createPermissionSet(perm: string) {
+    var permissions = new SP.BasePermissions();
+    switch (perm) {
+      case "FULL ACCESS":
+        permissions.set(SP.PermissionKind.manageLists);
+        permissions.set(SP.PermissionKind.cancelCheckout);
+        permissions.set(SP.PermissionKind.addListItems);
+        permissions.set(SP.PermissionKind.editListItems);
+        permissions.set(SP.PermissionKind.deleteListItems);
+        permissions.set(SP.PermissionKind.viewListItems);
+        permissions.set(SP.PermissionKind.approveItems);
+        permissions.set(SP.PermissionKind.openItems);
+        permissions.set(SP.PermissionKind.viewVersions);
+        permissions.set(SP.PermissionKind.deleteVersions);
+        permissions.set(SP.PermissionKind.createAlerts);
+        permissions.set(SP.PermissionKind.viewPages);
+        permissions.set(SP.PermissionKind.viewFormPages);
+        permissions.set(SP.PermissionKind.browseDirectories);
+        permissions.set(SP.PermissionKind.createSSCSite);
+        permissions.set(SP.PermissionKind.addAndCustomizePages);
+        permissions.set(SP.PermissionKind.browseUserInfo);
+        permissions.set(SP.PermissionKind.useRemoteAPIs);
+        permissions.set(SP.PermissionKind.useClientIntegration);
+        permissions.set(SP.PermissionKind.open);
+        permissions.set(SP.PermissionKind.editMyUserInfo);
+        permissions.set(SP.PermissionKind.managePersonalViews);
+        permissions.set(SP.PermissionKind.addDelPrivateWebParts);
+        permissions.set(SP.PermissionKind.updatePersonalWebParts);
+        break;
+      case "Edit With Delete":
+        // permissions.set(SP.PermissionKind.manageLists);
+        // permissions.set(SP.PermissionKind.cancelCheckout);
+        permissions.set(SP.PermissionKind.addListItems);
+        permissions.set(SP.PermissionKind.editListItems);
+        permissions.set(SP.PermissionKind.deleteListItems);
+        permissions.set(SP.PermissionKind.viewListItems);
+        //permissions.set(SP.PermissionKind.approveItems);
+        permissions.set(SP.PermissionKind.openItems);
+        permissions.set(SP.PermissionKind.viewVersions);
+        permissions.set(SP.PermissionKind.createAlerts);
+        permissions.set(SP.PermissionKind.viewPages);
+        permissions.set(SP.PermissionKind.viewFormPages);
+        permissions.set(SP.PermissionKind.browseDirectories);
+        permissions.set(SP.PermissionKind.createSSCSite);
+        permissions.set(SP.PermissionKind.addAndCustomizePages);
+        permissions.set(SP.PermissionKind.browseUserInfo);
+        permissions.set(SP.PermissionKind.useRemoteAPIs);
+        permissions.set(SP.PermissionKind.useClientIntegration);
+        permissions.set(SP.PermissionKind.open);
+        permissions.set(SP.PermissionKind.editMyUserInfo);
+        permissions.set(SP.PermissionKind.managePersonalViews);
+        permissions.set(SP.PermissionKind.addDelPrivateWebParts);
+        permissions.set(SP.PermissionKind.updatePersonalWebParts);
+        break;
+      case "Edit With No Delete":
+        // permissions.set(SP.PermissionKind.manageLists);
+        // permissions.set(SP.PermissionKind.cancelCheckout);
+        permissions.set(SP.PermissionKind.addListItems);
+        permissions.set(SP.PermissionKind.editListItems);
+        //permissions.set(SP.PermissionKind.deleteListItems);
+        permissions.set(SP.PermissionKind.viewListItems);
+        //permissions.set(SP.PermissionKind.approveItems);
+        permissions.set(SP.PermissionKind.openItems);
+        permissions.set(SP.PermissionKind.viewVersions);
+        permissions.set(SP.PermissionKind.createAlerts);
+        permissions.set(SP.PermissionKind.viewPages);
+        permissions.set(SP.PermissionKind.viewFormPages);
+        permissions.set(SP.PermissionKind.browseDirectories);
+        permissions.set(SP.PermissionKind.createSSCSite);
+        permissions.set(SP.PermissionKind.addAndCustomizePages);
+        permissions.set(SP.PermissionKind.browseUserInfo);
+        permissions.set(SP.PermissionKind.useRemoteAPIs);
+        permissions.set(SP.PermissionKind.useClientIntegration);
+        permissions.set(SP.PermissionKind.open);
+        permissions.set(SP.PermissionKind.editMyUserInfo);
+        permissions.set(SP.PermissionKind.managePersonalViews);
+        permissions.set(SP.PermissionKind.addDelPrivateWebParts);
+        permissions.set(SP.PermissionKind.updatePersonalWebParts);
+        break;
+      case "Read Only":
+        // permissions.set(SP.PermissionKind.manageLists);
+        // permissions.set(SP.PermissionKind.cancelCheckout);
+        //permissions.set(SP.PermissionKind.addListItems);
+        //permissions.set(SP.PermissionKind.editListItems);
+        //permissions.set(SP.PermissionKind.deleteListItems);
+        permissions.set(SP.PermissionKind.viewListItems);
+        //permissions.set(SP.PermissionKind.approveItems);
+        permissions.set(SP.PermissionKind.openItems);
+        permissions.set(SP.PermissionKind.viewVersions);
+        permissions.set(SP.PermissionKind.createAlerts);
+        permissions.set(SP.PermissionKind.viewPages);
+        permissions.set(SP.PermissionKind.viewFormPages);
+        //permissions.set(SP.PermissionKind.browseDirectories);
+        permissions.set(SP.PermissionKind.createSSCSite);
+        //permissions.set(SP.PermissionKind.addAndCustomizePages);
+        permissions.set(SP.PermissionKind.browseUserInfo);
+        permissions.set(SP.PermissionKind.useRemoteAPIs);
+        permissions.set(SP.PermissionKind.useClientIntegration);
+        permissions.set(SP.PermissionKind.open);
+        //permissions.set(SP.PermissionKind.editMyUserInfo);
+        //permissions.set(SP.PermissionKind.managePersonalViews);
+        //permissions.set(SP.PermissionKind.addDelPrivateWebParts);
+        //permissions.set(SP.PermissionKind.updatePersonalWebParts);
+        break;
+
+      default:
+        break;
+    }
+    return permissions;
+  }
+
   // called with the Create Site button is cliecked
   loadForm(event: any) {
     this.setState({ loadForm: true });
@@ -263,7 +423,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         ],
         mailEnabled: false,
         mailNickname: formData.groupEmailAddress,
-        securityEnabled : false,
+        securityEnabled: true,
         visibility: formData.privacyOptions.key
       });
     //create the site collection using graph api
@@ -287,8 +447,11 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               //create document libraries and Folder Structure
               self.createDocumentLibrariesJSOM(self.props.context.pageContext.web.absoluteUrl, data.webUrl).then((data) => {
                 self.getListsTitles(self.state.currentCreatedSiteUrl);
-                self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
-                Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
+                self.createCustomPermissionLevels(self.state.currentCreatedSiteUrl).then(() => {
+                  //read group to permission mappings from list, then add groups and assign permissions
+                  self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
+                  Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
+                });
 
               });
             });
