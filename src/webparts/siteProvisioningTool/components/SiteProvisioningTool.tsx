@@ -181,9 +181,9 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     //1. Prepare TaxonomyFieldValue
     var termValue = new SP.Taxonomy.TaxonomyFieldValue();
     termValue.set_label(self.state.formData.practice.text);
-    termValue.set_termGuid(self.state.formData.practice.text.key);
+    termValue.set_termGuid(self.state.formData.practice.key);
     termValue.set_wssId(-1);
-    oListItem.set_item('Client Name', 'test');
+    oListItem.set_item('Client_x0020_Name', self.state.formData.siteName);
     var pmVal = new SP.FieldUserValue();
     pmVal.set_lookupId(pmUser.get_id());   //specify User Id 
     oListItem.set_item('PM', pmVal);
@@ -192,7 +192,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     oListItem.set_item('Executive', execVal);
     var spVal = new SP.FieldUserValue();
     spVal.set_lookupId(spUser.get_id());   //specify User Id 
-    oListItem.set_item('Sales Person', spVal);
+    oListItem.set_item('Sales_x0020_Person', spVal);
     txField.setFieldValueByValue(oListItem, termValue);
     oListItem.update();
     context.load(oListItem);
@@ -586,11 +586,11 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         ],
         mailEnabled: false,
         mailNickname: formData.groupEmailAddress,
-        securityEnabled: true,
+        securityEnabled: false,
         visibility: formData.privacyOptions.key
       });
     //create the site collection using graph api
-     self.createNewSiteCollectionUsingGraph(self, siteCreationBody)
+    self.createNewSiteCollectionUsingGraph(self, siteCreationBody)
       .then(response => {
         return response.json();
       }).then(data => {
@@ -605,6 +605,13 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
             })
             .then(data => {
               self.setState({ showCurrentStatus: true, currentStatus: "Got the Site Collection ID" });
+              console.log(data);
+              if (data.error !== null && data.error !== undefined) {
+                self.setState({
+                  showCurrentStatus: true, currentStatus: "There is some permission error - " + data.error.message
+                });
+                return;
+              }
               var siteCollectionId = data.id;
               self.setState({ currentCreatedSiteUrl: data.webUrl });
               //create document libraries and Folder Structure
@@ -628,8 +635,10 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               });
             });
         }, 10000);
-
-
+      }, (error) => {
+        self.setState({
+          showCurrentStatus: true, currentStatus: "There is some error while creating - " + error.message
+        });
       });
   }
 
