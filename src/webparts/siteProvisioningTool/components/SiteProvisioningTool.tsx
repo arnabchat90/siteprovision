@@ -4,6 +4,8 @@ import { ISiteProvisioningToolProps } from './ISiteProvisioningToolProps';
 import { escape } from '@microsoft/sp-lodash-subset';
 import { WebPartContext, IWebPartContext } from '@microsoft/sp-webpart-base';
 import { AadHttpClient, MSGraphClient } from "@microsoft/sp-http";
+import { MessageBar, MessageBarType } from 'office-ui-fabric-react/lib/MessageBar';
+
 require('sp-init');
 require('microsoft-ajax');
 require('sp-runtime');
@@ -23,6 +25,8 @@ export interface ISiteProvisioningToolState {
   allPermissionLevels: any[];
   allTerms: any[];
   formData: IFormData;
+  messageBarType : MessageBarType;
+
 }
 
 import MockHttpClient from './MockHttpClient';
@@ -91,7 +95,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       error: '',
       allPermissionLevels: [],
       allTerms: null,
-      formData: null
+      formData: null,
+      messageBarType : MessageBarType.success
     };
     this.loadForm = this.loadForm.bind(this);
     this.createSiteCollection = this.createSiteCollection.bind(this);
@@ -269,11 +274,16 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         }
         self.setState({
           currentStatus: 'Reading All Permissions From Mapping List',
-          error: null
+          error: null,
+          messageBarType : MessageBarType.info
         });
         resolve(itemObjects);
 
       }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+        self.setState({
+          showCurrentStatus: true, currentStatus: "There is some error while provisioning your site" + args.get_message(),
+          messageBarType : MessageBarType.error
+        });
         reject(args.get_message());
       });
     });
@@ -286,7 +296,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       var self = this;
       this.setState({
         currentStatus: 'Creating Document Libraries...',
-        error: null
+        error: null,
+        messageBarType : MessageBarType.info
       });
       //read the list to get the project structure
       const context: SP.ClientContext = new SP.ClientContext(siteUrl);
@@ -308,7 +319,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
               self.setState({
                 currentStatus: 'All folders created',
-                error: null
+                error: null,
+                messageBarType : MessageBarType.info
               });
               resolve(true);
             }
@@ -335,7 +347,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       successFolderNavigation();
       self.setState({
         currentStatus: 'Creating folders -  ' + element.FolderStructure,
-        error: null
+        error: null,
+        messageBarType : MessageBarType.info
       });
     }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
       //if doc lib already exists try to create levels -- todo
@@ -346,9 +359,14 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         successFolderNavigation();
         self.setState({
           currentStatus: 'Creating folders -  ' + element.FolderStructure,
-          error: null
+          error: null,
+          messageBarType : MessageBarType.info
         });
       }, (sender: any, args: SP.ClientRequestFailedEventArgs): void => {
+        self.setState({
+          showCurrentStatus: true, currentStatus: "There is some error while provisioning  your site",
+          messageBarType : MessageBarType.error
+        });
       });
     });
   }
@@ -363,7 +381,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
           if (++i < spGroupPermissionMapping.length) {
             self.setState({
               currentStatus: 'Creating SharePoint Group - ' + spGroupPermissionMapping[i].SPGroupName,
-              error: null
+              error: null,
+              messageBarType : MessageBarType.info
             });
             loop(i);
 
@@ -371,12 +390,17 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
             //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
             self.setState({
               currentStatus: 'All SharePoint Groups Created',
-              error: null
+              error: null,
+              messageBarType : MessageBarType.info
             });
             resolve(true);
           }
         }, function (error) {
           reject(error);
+          self.setState({
+            showCurrentStatus: true, currentStatus: "There is some error - " + error.message,
+            messageBarType : MessageBarType.error
+          });
         });
       };
       loop(0);
@@ -400,7 +424,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
           if (++i < dsReadPermissions.length) {
             self.setState({
               currentStatus: 'Creating Custom Permission - ' + dsReadPermissions[i].levelName,
-              error: null
+              error: null,
+              messageBarType : MessageBarType.info
             });
             loop(i);
 
@@ -408,7 +433,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
             //act.SharePoint.SharePointAppProgress.completed(true, "Completed");
             self.setState({
               currentStatus: 'All Custom Permissions Created',
-              error: null
+              error: null,
+              messageBarType : MessageBarType.info
             });
             resolve(true);
           }
@@ -574,9 +600,24 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
     this.setState({ loadForm: true });
   }
   createSiteCollection(formData: IFormData) {
-    this.setState({ showCurrentStatus: true, currentStatus: "Provisioning your site" });
+    
+    
     var self = this;
     self.setState({ formData: formData });
+    if(formData.siteName == null || formData.siteName == undefined || formData.siteName == '') {
+      self.setState({ showCurrentStatus: true, currentStatus: "Site Name can not be empty",
+        messageBarType : MessageBarType.error });
+      return;
+    }
+
+    if(formData.siteDescription == null || formData.siteDescription == undefined || formData.siteDescription == '') {
+      self.setState({ showCurrentStatus: true, currentStatus: "Site Description can not be empty",
+        messageBarType : MessageBarType.error });
+      return;
+    }
+    
+    self.setState({ showCurrentStatus: true, currentStatus: "Provisioning your site",
+    messageBarType : MessageBarType.info });
     const siteCreationBody: string = JSON.stringify(
       {
         description: formData.siteDescription,
@@ -596,7 +637,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
       }).then(data => {
         console.log(data);
         //get root site collection id from group id
-        self.setState({ showCurrentStatus: true, currentStatus: "Created Site Collection, looking for the site id..." });
+        self.setState({ showCurrentStatus: true, currentStatus: "Created Site Collection, looking for the site id...",
+        messageBarType : MessageBarType.info });
         var groupId = data.id;
         setTimeout(function () {
           self.getSiteCollectionIdFromGroupId(self, groupId)
@@ -604,11 +646,13 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               return response.json();
             })
             .then(data => {
-              self.setState({ showCurrentStatus: true, currentStatus: "Got the Site Collection ID" });
+              self.setState({ showCurrentStatus: true, currentStatus: "Got the Site Collection ID",
+              messageBarType : MessageBarType.info });
               console.log(data);
               if (data.error !== null && data.error !== undefined) {
                 self.setState({
-                  showCurrentStatus: true, currentStatus: "There is some permission error - " + data.error.message
+                  showCurrentStatus: true, currentStatus: "There is some error - " + data.error.message,
+                  messageBarType : MessageBarType.error
                 });
                 return;
               }
@@ -616,7 +660,7 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
               self.setState({ currentCreatedSiteUrl: data.webUrl });
               //create document libraries and Folder Structure
               self.createDocumentLibrariesJSOM(self.props.context.pageContext.web.absoluteUrl, data.webUrl).then((data) => {
-                self.getListsTitles(self.state.currentCreatedSiteUrl);
+                //self.getListsTitles(self.state.currentCreatedSiteUrl);
                 self.createCustomPermissionLevels(self.state.currentCreatedSiteUrl).then(() => {
                   //read group to permission mappings from list, then add groups and assign permissions
                   const context: SP.ClientContext = new SP.ClientContext(self.props.context.pageContext.web.absoluteUrl);
@@ -625,7 +669,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
                     self.createSharePointGroups(self.state.currentCreatedSiteUrl, groupPermissionMappings).then(() => {
                       //add item to the projects list and then show success
                       self.addItemToProjectsList(context, 'Projects');
-                      self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created" });
+                      self.setState({ showCurrentStatus: true, currentStatus: "Your brand new team site has been created",
+                      messageBarType : MessageBarType.success });
                       Object.assign(document.createElement('a'), { target: '_blank', href: self.state.currentCreatedSiteUrl }).click();
                     });
                   });
@@ -637,7 +682,8 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
         }, 10000);
       }, (error) => {
         self.setState({
-          showCurrentStatus: true, currentStatus: "There is some error while creating - " + error.message
+          showCurrentStatus: true, currentStatus: "There is some error while creating - " + error.message,
+          messageBarType : MessageBarType.error
         });
       });
   }
@@ -737,16 +783,16 @@ export default class SiteProvisioningTool extends React.Component<ISiteProvision
 
           </div>
 
-        </div> : <MainForm createSiteCollection={this.createSiteCollection} spContext={this.props.context} practiceTerms={this.state.allTerms} currentStatus={this.state.currentStatus} showCurrentStatus={this.state.showCurrentStatus} />}
+        </div> : <MainForm createSiteCollection={this.createSiteCollection} spContext={this.props.context} practiceTerms={this.state.allTerms} currentStatus={this.state.currentStatus} messageBarType={this.state.messageBarType} showCurrentStatus={this.state.showCurrentStatus} />}
         <br />
-        {this.state.loadingLists &&
+        {/* {this.state.loadingLists &&
           <span>Loading lists...</span>}
         {this.state.error &&
           <span>An error has occurred while loading lists: {this.state.error}</span>}
         {this.state.error === null && titles &&
           <ul>
             {titles}
-          </ul>}
+          </ul>} */}
       </div>
     );
   }

@@ -13,6 +13,10 @@ import {
     SPHttpClientResponse
 } from '@microsoft/sp-http';
 
+import { MessageBarButton } from 'office-ui-fabric-react/lib/Button';
+import { Link } from 'office-ui-fabric-react/lib/Link';
+import { MessageBar, MessageBarType } from 'office-ui-fabric-react/lib/MessageBar';
+
 export interface IMainState {
     init: boolean;
     formData: IFormData;
@@ -27,7 +31,7 @@ export interface IFormData {
     executive: Array<any>;
     sp: Array<any>;
     privacyOptions: any;
-    practice : any;
+    practice: any;
 }
 
 export interface IMainProps {
@@ -36,6 +40,7 @@ export interface IMainProps {
     currentStatus: string;
     showCurrentStatus: boolean;
     practiceTerms: any[];
+    messageBarType : MessageBarType;
 }
 
 export default class MainForm extends React.Component<IMainProps, IMainState> {
@@ -52,8 +57,7 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                 executive: [],
                 sp: [],
                 privacyOptions: {},
-                practice : {}
-
+                practice: {}
             }
         }
 
@@ -120,19 +124,24 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                 <div className={styles.container}>
                     {this.props.showCurrentStatus == true ? <div className={styles.row}>
                         <div className={styles.column}>
-                            <h3>{this.props.currentStatus}</h3>
+                            <MessageBar
+                                messageBarType={this.props.messageBarType}
+                                isMultiline={true}
+                            >
+                                {this.props.currentStatus}
+                            </MessageBar>
                         </div>
                     </div> : ""}
 
                     <div className={styles.row}>
                         <div className={styles.column}>
-                            <Label style={{ fontWeight: FontWeights.semibold }} htmlFor="siteName">Site Name</Label>
+                            <Label style={{ fontWeight: FontWeights.semibold }} htmlFor="siteName">Site Name *</Label>
                             <TextField id="siteName" value={this.state.formData.siteName} onChanged={(newValue) => { this._handleOnChange(newValue, "siteName") }} />
                         </div>
                     </div>
                     <div className={styles.row}>
                         <div className={styles.column}>
-                            <Label style={{ fontWeight: FontWeights.semibold }} htmlFor="siteDescription">Site Description</Label>
+                            <Label style={{ fontWeight: FontWeights.semibold }} htmlFor="siteDescription">Site Description *</Label>
                             <TextField multiline rows={4} id="siteDescription" value={this.state.formData.siteDescription} onChanged={(newValue) => { this._handleOnChange(newValue, "siteDescription") }} />
                         </div>
                     </div>
@@ -231,7 +240,7 @@ export default class MainForm extends React.Component<IMainProps, IMainState> {
                                 showHiddenInUI={false}
                                 principalTypes={[PrincipalType.User]}
                                 resolveDelay={500} />
-                        </div> 
+                        </div>
                     </div>
                     <div className={styles.row}>
                         <div className={styles.column}>
