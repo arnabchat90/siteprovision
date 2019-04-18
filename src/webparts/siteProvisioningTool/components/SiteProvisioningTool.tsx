@@ -60,14 +60,18 @@ function createFolder(list, folderUrl) {
     var ctx = parentFolder.get_context();
     var folderNames = folderUrl.split("/");
     var folderName = folderNames.shift();
-    var folder = parentFolder.get_folders().add(folderName);
-    ctx.load(folder);
-    return executeQuery(ctx).then(function() {
-      if (folderNames.length > 0) {
-        return createFolderInternal(folder, folderNames.join("/"));
-      }
-      return folder;
-    });
+    if(folderName !== "") {
+      var folder = parentFolder.get_folders().add(folderName);
+      ctx.load(folder);
+      return executeQuery(ctx).then(function() {
+        if (folderNames.length > 0) {
+          return createFolderInternal(folder, folderNames.join("/"));
+        }
+        return folder;
+      }, function(error) {
+          console.log(error);
+      });
+    }
   };
   return createFolderInternal(list.get_rootFolder(), folderUrl);
 }
@@ -240,14 +244,21 @@ export default class SiteProvisioningTool extends React.Component<
     termValue.set_wssId(-1);
     oListItem.set_item("Client_x0020_Name", self.state.currentCreatedSiteUrl);
     var pmVal = new SP.FieldUserValue();
-    pmVal.set_lookupId(pmUser.get_id()); //specify User Id
-    oListItem.set_item("PM", pmVal);
+    if(pmUser !== null) {
+      pmVal.set_lookupId(pmUser.get_id()); //specify User Id
+      oListItem.set_item("PM", pmVal);
+    }
     var execVal = new SP.FieldUserValue();
-    execVal.set_lookupId(execUser.get_id()); //specify User Id
-    oListItem.set_item("Executive", execVal);
+    if(execUser !== null) {
+      execVal.set_lookupId(execUser.get_id()); //specify User Id
+      oListItem.set_item("Executive", execVal);
+    }
     var spVal = new SP.FieldUserValue();
-    spVal.set_lookupId(spUser.get_id()); //specify User Id
-    oListItem.set_item("Sales_x0020_Person", spVal);
+    if(spUser !== null) {
+      spVal.set_lookupId(spUser.get_id()); //specify User Id
+      oListItem.set_item("Sales_x0020_Person", spVal);
+    }
+    
     txField.setFieldValueByValue(oListItem, termValue);
     oListItem.update();
     context.load(oListItem);
@@ -401,6 +412,7 @@ export default class SiteProvisioningTool extends React.Component<
           //create doc libraries based on the configuration list
 
           var loop = function(i) {
+
             self.createFolderStructure(
               items[i],
               newlists,
@@ -443,6 +455,7 @@ export default class SiteProvisioningTool extends React.Component<
     docLibCreation.set_templateType(SP.ListTemplateType.documentLibrary); //document library type
     var newDocLib = newlists.add(docLibCreation);
     newContext.load(newDocLib);
+    newContext.set_requestTimeout(1000 * 60 * 3);
     newContext.executeQueryAsync(
       (sender: any, args: SP.ClientRequestSucceededEventArgs): void => {
         //new doc library created now create folders by reading the folders list
@@ -827,6 +840,18 @@ export default class SiteProvisioningTool extends React.Component<
         data => {
           console.log(data);
           //get root site collection id from group id
+          if(data.error) {
+              if(data.error.message == "Another object with the same value for property mailNickname already exists.") {
+                self.setState({
+                  showCurrentStatus: true,
+                  currentStatus:
+                    "This site collection already exists please choose another name for the site collection",
+                  messageBarType: MessageBarType.error,
+                  finishDisabled : false
+                });
+              }
+              return false;
+          }
           self.setState({
             showCurrentStatus: true,
             currentStatus:
@@ -905,14 +930,15 @@ export default class SiteProvisioningTool extends React.Component<
                       });
                   });
               });
-          }, 10000);
+          }, 15000);
         },
         error => {
           self.setState({
             showCurrentStatus: true,
             currentStatus:
               "There is some error while creating - " + error.message,
-            messageBarType: MessageBarType.error
+            messageBarType: MessageBarType.error,
+            finishDisabled : false
           });
         }
       );

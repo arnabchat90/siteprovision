@@ -20,7 +20,7 @@ export default class DocumentCardCreateSite extends React.Component<any, any> {
           previewImageSrc: logo,
           //iconSrc: logo,
           imageFit: ImageFit.cover,
-          width: 318,
+          width: 350,
           height: 196
         }
       ]
